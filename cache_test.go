@@ -12,9 +12,8 @@ var redisClient *redis.Pool
 var redisClientOnce sync.Once
 
 func getTestClient() *redis.Pool {
-	// server := ":6379"
-	server := "papi-stg-vpc.redis.rds.aliyuncs.com:6379"
-	password := "aQKtfwrEdhy8wKRu"
+	server := ":6379"
+	password := "xxxxxxxxxx"
 
 	redisClientOnce.Do(func() {
 		redisClient = &redis.Pool{
