@@ -10,6 +10,9 @@ import (
 	"github.com/cclehui/redis-util"
 )
 
+server := ":6379"
+password := "xxxxxxxxxx"
+
 redisClient := &redis.Pool{
 	Dial: func() (redis.Conn, error) {
 		  c, err := redis.Dial("tcp", server)
