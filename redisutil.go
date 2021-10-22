@@ -8,15 +8,15 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
-type CacheUtil struct {
+type RedisUtil struct {
 	pool *redis.Pool
 }
 
-func NewCacheUtil(pool *redis.Pool) *CacheUtil {
-	return &CacheUtil{pool}
+func NewRedisUtil(pool *redis.Pool) *RedisUtil {
+	return &RedisUtil{pool}
 }
 
-func (cache *CacheUtil) Set(key string, value interface{}, ttl int) (err error) {
+func (ru *RedisUtil) Set(key string, value interface{}, ttl int) (err error) {
 	var bytesData []byte
 
 	// 判断是否整数
@@ -30,7 +30,7 @@ func (cache *CacheUtil) Set(key string, value interface{}, ttl int) (err error) 
 		}
 	}
 
-	err = cache.WrapDo(func(con redis.Conn) error {
+	err = ru.WrapDo(func(con redis.Conn) error {
 		_, err = con.Do("SET", keyPatch(key), bytesData, "EX", ttl)
 		if err != nil {
 			return err
@@ -46,14 +46,14 @@ func (cache *CacheUtil) Set(key string, value interface{}, ttl int) (err error) 
 	return nil
 }
 
-func (cache *CacheUtil) Get(key string, value interface{}) (hit bool, err error) {
+func (ru *RedisUtil) Get(key string, value interface{}) (hit bool, err error) {
 	if reflect.ValueOf(value).Kind() != reflect.Ptr {
 		return false, errors.New("value must be ptr")
 	}
 
 	var replay []byte
 
-	err = cache.WrapDo(func(con redis.Conn) error {
+	err = ru.WrapDo(func(con redis.Conn) error {
 		replay, err = redis.Bytes(con.Do("GET", keyPatch(key)))
 
 		if err != nil {
@@ -84,8 +84,8 @@ func (cache *CacheUtil) Get(key string, value interface{}) (hit bool, err error)
 	return true, nil
 }
 
-func (cache *CacheUtil) Del(key string) (err error) {
-	err = cache.WrapDo(func(con redis.Conn) error {
+func (ru *RedisUtil) Del(key string) (err error) {
+	err = ru.WrapDo(func(con redis.Conn) error {
 		_, err = con.Do("DEL", keyPatch(key))
 
 		return err
@@ -94,8 +94,8 @@ func (cache *CacheUtil) Del(key string) (err error) {
 	return err
 }
 
-func (cache *CacheUtil) Expire(key string, ttl int) (err error) {
-	err = cache.WrapDo(func(con redis.Conn) error {
+func (ru *RedisUtil) Expire(key string, ttl int) (err error) {
+	err = ru.WrapDo(func(con redis.Conn) error {
 		_, err = con.Do("EXPIRE", keyPatch(key), ttl)
 
 		return err
@@ -104,8 +104,8 @@ func (cache *CacheUtil) Expire(key string, ttl int) (err error) {
 	return err
 }
 
-func (cache *CacheUtil) TTL(key string) (ttl int, err error) {
-	err = cache.WrapDo(func(con redis.Conn) error {
+func (ru *RedisUtil) TTL(key string) (ttl int, err error) {
+	err = ru.WrapDo(func(con redis.Conn) error {
 		ttl, err = redis.Int(con.Do("TTL", keyPatch(key)))
 
 		return err
@@ -114,8 +114,8 @@ func (cache *CacheUtil) TTL(key string) (ttl int, err error) {
 	return ttl, err
 }
 
-func (cache *CacheUtil) Incr(key string) (res int64, err error) {
-	err = cache.WrapDo(func(con redis.Conn) error {
+func (ru *RedisUtil) Incr(key string) (res int64, err error) {
+	err = ru.WrapDo(func(con redis.Conn) error {
 		res, err = redis.Int64(con.Do("INCR", keyPatch(key)))
 
 		return err
@@ -124,8 +124,8 @@ func (cache *CacheUtil) Incr(key string) (res int64, err error) {
 	return res, err
 }
 
-func (cache *CacheUtil) IncrBy(key string, diff int64) (res int64, err error) {
-	err = cache.WrapDo(func(con redis.Conn) error {
+func (ru *RedisUtil) IncrBy(key string, diff int64) (res int64, err error) {
+	err = ru.WrapDo(func(con redis.Conn) error {
 		res, err = redis.Int64(con.Do("INCRBY", keyPatch(key), diff))
 
 		return err
@@ -134,8 +134,8 @@ func (cache *CacheUtil) IncrBy(key string, diff int64) (res int64, err error) {
 	return res, err
 }
 
-func (cache *CacheUtil) Decr(key string) (res int64, err error) {
-	err = cache.WrapDo(func(con redis.Conn) error {
+func (ru *RedisUtil) Decr(key string) (res int64, err error) {
+	err = ru.WrapDo(func(con redis.Conn) error {
 		res, err = redis.Int64(con.Do("DECR", keyPatch(key)))
 
 		return err
@@ -144,8 +144,8 @@ func (cache *CacheUtil) Decr(key string) (res int64, err error) {
 	return res, err
 }
 
-func (cache *CacheUtil) DecrBy(key string, diff int64) (res int64, err error) {
-	err = cache.WrapDo(func(con redis.Conn) error {
+func (ru *RedisUtil) DecrBy(key string, diff int64) (res int64, err error) {
+	err = ru.WrapDo(func(con redis.Conn) error {
 		res, err = redis.Int64(con.Do("DECRBY", keyPatch(key), diff))
 
 		return err
@@ -154,8 +154,8 @@ func (cache *CacheUtil) DecrBy(key string, diff int64) (res int64, err error) {
 	return res, err
 }
 
-func (cache *CacheUtil) WrapDo(doFunction func(con redis.Conn) error) error {
-	con := cache.pool.Get()
+func (ru *RedisUtil) WrapDo(doFunction func(con redis.Conn) error) error {
+	con := ru.pool.Get()
 	defer con.Close()
 
 	return doFunction(con)

@@ -49,26 +49,26 @@ type testStruct struct {
 }
 
 func TestSetGet(t *testing.T) {
-	cacheUtil := NewCacheUtil(getTestClient())
+	redisUtil := NewRedisUtil(getTestClient())
 	cacheKey := "cclehui_test_set_get_key_211022"
 
 	// 整形测试
 	value := 1
 
-	err := cacheUtil.Set(cacheKey, value, 3600)
+	err := redisUtil.Set(cacheKey, value, 3600)
 	assert.Equal(t, err, nil)
 
-	_, _ = cacheUtil.Get(cacheKey, &value)
+	_, _ = redisUtil.Get(cacheKey, &value)
 	assert.Equal(t, value, 1)
 
 	// 字符串测试
 	valueStr := "adfasf&%%^*(我哈哈哈哈啊啊}{）*&……&"
 
-	err = cacheUtil.Set(cacheKey, valueStr, 3600)
+	err = redisUtil.Set(cacheKey, valueStr, 3600)
 	assert.Equal(t, err, nil)
 
 	valueStrRes := ""
-	_, _ = cacheUtil.Get(cacheKey, &valueStrRes)
+	_, _ = redisUtil.Get(cacheKey, &valueStrRes)
 	assert.Equal(t, valueStr, valueStrRes)
 
 	// struct 测试
@@ -79,8 +79,8 @@ func TestSetGet(t *testing.T) {
 
 	cclehuiRes := &testStruct{}
 
-	_ = cacheUtil.Set(cacheKey, cclehui, 3600)
-	_, _ = cacheUtil.Get(cacheKey, cclehuiRes)
+	_ = redisUtil.Set(cacheKey, cclehui, 3600)
+	_, _ = redisUtil.Get(cacheKey, cclehuiRes)
 	assert.Equal(t, cclehui, cclehuiRes)
 
 	// map 测试
@@ -91,40 +91,40 @@ func TestSetGet(t *testing.T) {
 
 	mapTestRes := make(map[string]interface{})
 
-	_ = cacheUtil.Set(cacheKey, mapTest, 3600)
-	_, _ = cacheUtil.Get(cacheKey, &mapTestRes)
+	_ = redisUtil.Set(cacheKey, mapTest, 3600)
+	_, _ = redisUtil.Get(cacheKey, &mapTestRes)
 	assert.Equal(t, mapTest, mapTestRes)
 
 	// 删除
-	err = cacheUtil.Del(cacheKey)
+	err = redisUtil.Del(cacheKey)
 	assert.Equal(t, err, nil)
 }
 
 func TestIncrDecr(t *testing.T) {
-	cacheUtil := NewCacheUtil(getTestClient())
+	redisUtil := NewRedisUtil(getTestClient())
 	cacheKey := "cclehui_test_incr_decr_key_211022"
 
-	_ = cacheUtil.Del(cacheKey)
+	_ = redisUtil.Del(cacheKey)
 
-	_ = cacheUtil.Set(cacheKey, 1, 3600)
+	_ = redisUtil.Set(cacheKey, 1, 3600)
 
-	value, _ := cacheUtil.Incr(cacheKey)
+	value, _ := redisUtil.Incr(cacheKey)
 	assert.Equal(t, value, int64(2))
 
-	value, _ = cacheUtil.Decr(cacheKey)
+	value, _ = redisUtil.Decr(cacheKey)
 	assert.Equal(t, value, int64(1))
 
-	value, _ = cacheUtil.IncrBy(cacheKey, 10)
+	value, _ = redisUtil.IncrBy(cacheKey, 10)
 	assert.Equal(t, value, int64(11))
 
-	value, _ = cacheUtil.DecrBy(cacheKey, 10)
+	value, _ = redisUtil.DecrBy(cacheKey, 10)
 	assert.Equal(t, value, int64(1))
 
-	// _ = cacheUtil.DeleteCache(cacheKey)
+	// _ = redisUtil.DeleteCache(cacheKey)
 
-	_ = cacheUtil.Expire(cacheKey, 600)
+	_ = redisUtil.Expire(cacheKey, 600)
 
-	ttl, _ := cacheUtil.TTL(cacheKey)
+	ttl, _ := redisUtil.TTL(cacheKey)
 	if ttl < 0 || ttl > 600 {
 		t.Fatalf("ttl时间异常, %d", ttl)
 	}
