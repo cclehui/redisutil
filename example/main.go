@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	redisutil "github.com/cclehui/redis-util"
@@ -8,8 +9,9 @@ import (
 )
 
 func main() {
-	server := "xxxxx:6379"
-	password := "wxxxxxxxxx"
+	server := "127.0.0.1:6379"
+	password := "123456"
+	ctx := context.Background()
 
 	redisClient := &redis.Pool{
 		Dial: func() (redis.Conn, error) {
@@ -30,17 +32,17 @@ func main() {
 	redisUtil := redisutil.NewRedisUtil(redisClient)
 	cacheKey := "cclehui_test_set_get_key_211022"
 
-	_ = redisUtil.Set(cacheKey, "axxxaa", 3600) // 设置缓存
+	_ = redisUtil.Set(ctx, cacheKey, "axxxaa", 3600) // 设置缓存
 
 	valueStrRes := ""
-	_, _ = redisUtil.Get(cacheKey, &valueStrRes) // 获取缓存
+	_, _ = redisUtil.Get(ctx, cacheKey, &valueStrRes) // 获取缓存
 	fmt.Println("获取缓存:", valueStrRes)
 
-	_ = redisUtil.Del(cacheKey) // Del
+	_ = redisUtil.Del(ctx, cacheKey) // Del
 
-	value, _ := redisUtil.Incr(cacheKey)
+	value, _ := redisUtil.Incr(ctx, cacheKey)
 	fmt.Println("Incr:", value)
 
-	value, _ = redisUtil.Decr(cacheKey)
+	value, _ = redisUtil.Decr(ctx, cacheKey)
 	fmt.Println("Decr:", value)
 }

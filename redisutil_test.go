@@ -1,6 +1,7 @@
 package redisutil
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -10,10 +11,11 @@ import (
 
 var redisClient *redis.Pool
 var redisClientOnce sync.Once
+var ctx = context.Background()
 
 func getTestClient() *redis.Pool {
-	server := ":6379"
-	password := "xxxxxxxxxx"
+	server := "127.0.0.1:6379"
+	password := "123456"
 
 	redisClientOnce.Do(func() {
 		redisClient = &redis.Pool{
@@ -55,20 +57,20 @@ func TestSetGet(t *testing.T) {
 	// 整形测试
 	value := 1
 
-	err := redisUtil.Set(cacheKey, value, 3600)
+	err := redisUtil.Set(ctx, cacheKey, value, 3600)
 	assert.Equal(t, err, nil)
 
-	_, _ = redisUtil.Get(cacheKey, &value)
+	_, _ = redisUtil.Get(ctx, cacheKey, &value)
 	assert.Equal(t, value, 1)
 
 	// 字符串测试
 	valueStr := "adfasf&%%^*(我哈哈哈哈啊啊}{）*&……&"
 
-	err = redisUtil.Set(cacheKey, valueStr, 3600)
+	err = redisUtil.Set(ctx, cacheKey, valueStr, 3600)
 	assert.Equal(t, err, nil)
 
 	valueStrRes := ""
-	_, _ = redisUtil.Get(cacheKey, &valueStrRes)
+	_, _ = redisUtil.Get(ctx, cacheKey, &valueStrRes)
 	assert.Equal(t, valueStr, valueStrRes)
 
 	// struct 测试
@@ -79,8 +81,8 @@ func TestSetGet(t *testing.T) {
 
 	cclehuiRes := &testStruct{}
 
-	_ = redisUtil.Set(cacheKey, cclehui, 3600)
-	_, _ = redisUtil.Get(cacheKey, cclehuiRes)
+	_ = redisUtil.Set(ctx, cacheKey, cclehui, 3600)
+	_, _ = redisUtil.Get(ctx, cacheKey, cclehuiRes)
 	assert.Equal(t, cclehui, cclehuiRes)
 
 	// map 测试
@@ -91,12 +93,12 @@ func TestSetGet(t *testing.T) {
 
 	mapTestRes := make(map[string]interface{})
 
-	_ = redisUtil.Set(cacheKey, mapTest, 3600)
-	_, _ = redisUtil.Get(cacheKey, &mapTestRes)
+	_ = redisUtil.Set(ctx, cacheKey, mapTest, 3600)
+	_, _ = redisUtil.Get(ctx, cacheKey, &mapTestRes)
 	assert.Equal(t, mapTest, mapTestRes)
 
 	// 删除
-	err = redisUtil.Del(cacheKey)
+	err = redisUtil.Del(ctx, cacheKey)
 	assert.Equal(t, err, nil)
 }
 
@@ -104,27 +106,27 @@ func TestIncrDecr(t *testing.T) {
 	redisUtil := NewRedisUtil(getTestClient())
 	cacheKey := "cclehui_test_incr_decr_key_211022"
 
-	_ = redisUtil.Del(cacheKey)
+	_ = redisUtil.Del(ctx, cacheKey)
 
-	_ = redisUtil.Set(cacheKey, 1, 3600)
+	_ = redisUtil.Set(ctx, cacheKey, 1, 3600)
 
-	value, _ := redisUtil.Incr(cacheKey)
+	value, _ := redisUtil.Incr(ctx, cacheKey)
 	assert.Equal(t, value, int64(2))
 
-	value, _ = redisUtil.Decr(cacheKey)
+	value, _ = redisUtil.Decr(ctx, cacheKey)
 	assert.Equal(t, value, int64(1))
 
-	value, _ = redisUtil.IncrBy(cacheKey, 10)
+	value, _ = redisUtil.IncrBy(ctx, cacheKey, 10)
 	assert.Equal(t, value, int64(11))
 
-	value, _ = redisUtil.DecrBy(cacheKey, 10)
+	value, _ = redisUtil.DecrBy(ctx, cacheKey, 10)
 	assert.Equal(t, value, int64(1))
 
 	// _ = redisUtil.DeleteCache(cacheKey)
 
-	_ = redisUtil.Expire(cacheKey, 600)
+	_ = redisUtil.Expire(ctx, cacheKey, 600)
 
-	ttl, _ := redisUtil.TTL(cacheKey)
+	ttl, _ := redisUtil.TTL(ctx, cacheKey)
 	if ttl < 0 || ttl > 600 {
 		t.Fatalf("ttl时间异常, %d", ttl)
 	}

@@ -1,6 +1,7 @@
 package redisutil
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/pkg/errors"
@@ -16,7 +17,7 @@ func NewRedisUtil(pool *redis.Pool) *RedisUtil {
 	return &RedisUtil{pool}
 }
 
-func (ru *RedisUtil) Set(key string, value interface{}, ttl int) (err error) {
+func (ru *RedisUtil) Set(ctx context.Context, key string, value interface{}, ttl int) (err error) {
 	var bytesData []byte
 
 	// 判断是否整数
@@ -30,7 +31,7 @@ func (ru *RedisUtil) Set(key string, value interface{}, ttl int) (err error) {
 		}
 	}
 
-	err = ru.WrapDo(func(con redis.Conn) error {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		_, err = con.Do("SET", keyPatch(key), bytesData, "EX", ttl)
 		if err != nil {
 			return err
@@ -46,14 +47,14 @@ func (ru *RedisUtil) Set(key string, value interface{}, ttl int) (err error) {
 	return nil
 }
 
-func (ru *RedisUtil) Get(key string, value interface{}) (hit bool, err error) {
+func (ru *RedisUtil) Get(ctx context.Context, key string, value interface{}) (hit bool, err error) {
 	if reflect.ValueOf(value).Kind() != reflect.Ptr {
 		return false, errors.New("value must be ptr")
 	}
 
 	var replay []byte
 
-	err = ru.WrapDo(func(con redis.Conn) error {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		replay, err = redis.Bytes(con.Do("GET", keyPatch(key)))
 
 		if err != nil {
@@ -84,8 +85,8 @@ func (ru *RedisUtil) Get(key string, value interface{}) (hit bool, err error) {
 	return true, nil
 }
 
-func (ru *RedisUtil) Del(key string) (err error) {
-	err = ru.WrapDo(func(con redis.Conn) error {
+func (ru *RedisUtil) Del(ctx context.Context, key string) (err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		_, err = con.Do("DEL", keyPatch(key))
 
 		return err
@@ -94,8 +95,8 @@ func (ru *RedisUtil) Del(key string) (err error) {
 	return err
 }
 
-func (ru *RedisUtil) Expire(key string, ttl int) (err error) {
-	err = ru.WrapDo(func(con redis.Conn) error {
+func (ru *RedisUtil) Expire(ctx context.Context, key string, ttl int) (err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		_, err = con.Do("EXPIRE", keyPatch(key), ttl)
 
 		return err
@@ -104,8 +105,8 @@ func (ru *RedisUtil) Expire(key string, ttl int) (err error) {
 	return err
 }
 
-func (ru *RedisUtil) TTL(key string) (ttl int, err error) {
-	err = ru.WrapDo(func(con redis.Conn) error {
+func (ru *RedisUtil) TTL(ctx context.Context, key string) (ttl int, err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		ttl, err = redis.Int(con.Do("TTL", keyPatch(key)))
 
 		return err
@@ -114,8 +115,8 @@ func (ru *RedisUtil) TTL(key string) (ttl int, err error) {
 	return ttl, err
 }
 
-func (ru *RedisUtil) Incr(key string) (res int64, err error) {
-	err = ru.WrapDo(func(con redis.Conn) error {
+func (ru *RedisUtil) Incr(ctx context.Context, key string) (res int64, err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		res, err = redis.Int64(con.Do("INCR", keyPatch(key)))
 
 		return err
@@ -124,8 +125,8 @@ func (ru *RedisUtil) Incr(key string) (res int64, err error) {
 	return res, err
 }
 
-func (ru *RedisUtil) IncrBy(key string, diff int64) (res int64, err error) {
-	err = ru.WrapDo(func(con redis.Conn) error {
+func (ru *RedisUtil) IncrBy(ctx context.Context, key string, diff int64) (res int64, err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		res, err = redis.Int64(con.Do("INCRBY", keyPatch(key), diff))
 
 		return err
@@ -134,8 +135,8 @@ func (ru *RedisUtil) IncrBy(key string, diff int64) (res int64, err error) {
 	return res, err
 }
 
-func (ru *RedisUtil) Decr(key string) (res int64, err error) {
-	err = ru.WrapDo(func(con redis.Conn) error {
+func (ru *RedisUtil) Decr(ctx context.Context, key string) (res int64, err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		res, err = redis.Int64(con.Do("DECR", keyPatch(key)))
 
 		return err
@@ -144,8 +145,8 @@ func (ru *RedisUtil) Decr(key string) (res int64, err error) {
 	return res, err
 }
 
-func (ru *RedisUtil) DecrBy(key string, diff int64) (res int64, err error) {
-	err = ru.WrapDo(func(con redis.Conn) error {
+func (ru *RedisUtil) DecrBy(ctx context.Context, key string, diff int64) (res int64, err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		res, err = redis.Int64(con.Do("DECRBY", keyPatch(key), diff))
 
 		return err
@@ -154,7 +155,7 @@ func (ru *RedisUtil) DecrBy(key string, diff int64) (res int64, err error) {
 	return res, err
 }
 
-func (ru *RedisUtil) WrapDo(doFunction func(con redis.Conn) error) error {
+func (ru *RedisUtil) WrapDo(ctx context.Context, doFunction func(con redis.Conn) error) error {
 	con := ru.pool.Get()
 	defer con.Close()
 
