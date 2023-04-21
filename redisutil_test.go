@@ -2,48 +2,12 @@ package redisutil
 
 import (
 	"context"
-	"sync"
 	"testing"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/stretchr/testify/assert"
 )
 
-var redisClient *redis.Pool
-var redisClientOnce sync.Once
 var ctx = context.Background()
-
-func getTestClient() *redis.Pool {
-	server := "127.0.0.1:6379"
-	password := "123456"
-
-	redisClientOnce.Do(func() {
-		redisClient = &redis.Pool{
-			// Other pool configuration not shown in this example.
-			Dial: func() (redis.Conn, error) {
-				c, err := redis.Dial("tcp", server)
-				if err != nil {
-					return nil, err
-				}
-
-				if _, err := c.Do("AUTH", password); err != nil {
-					c.Close()
-					return nil, err
-				}
-
-				/*
-					if _, err := c.Do("SELECT", db); err != nil {
-						c.Close()
-						return nil, err
-					}
-				*/
-				return c, nil
-			},
-		}
-	})
-
-	return redisClient
-}
 
 type testStruct struct {
 	Name string
@@ -51,7 +15,7 @@ type testStruct struct {
 }
 
 func TestSetGet(t *testing.T) {
-	redisUtil := NewRedisUtil(getTestClient())
+	redisUtil := NewRedisUtil(getTestPool())
 	cacheKey := "cclehui_test_set_get_key_211022"
 
 	// 整形测试
@@ -103,7 +67,7 @@ func TestSetGet(t *testing.T) {
 }
 
 func TestIncrDecr(t *testing.T) {
-	redisUtil := NewRedisUtil(getTestClient())
+	redisUtil := NewRedisUtil(getTestPool())
 	cacheKey := "cclehui_test_incr_decr_key_211022"
 
 	_ = redisUtil.Del(ctx, cacheKey)

@@ -14,6 +14,15 @@ func keyPatch(key string) string {
 	return key
 }
 
+func keysPatch(keys []string) []interface{} {
+	result := make([]interface{}, len(keys))
+	for i, key := range keys {
+		result[i] = keyPatch(key)
+	}
+
+	return result
+}
+
 func isNum(i interface{}) (string, bool) {
 	switch vi := i.(type) {
 	case int8:

@@ -1,0 +1,7 @@
+redis:
+  # 连接地址
+  endpoint:
+    address: localhost
+    port: 6379
+  # 校验密码
+  auth: ""
