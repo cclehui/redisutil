@@ -1,5 +1,8 @@
-# redis-util
-方便业务使用的redis操作封装，比如常见的缓存set get操作， 一行代码搞定,不像开源库需要写好多行
+# redisutil
+1. 换成封装
+2. 方便业务使用的redis操作封装，比如常见的缓存set get操作， 一行代码搞定,不像开源库需要写好多行
+3. mget
+4. batchset
 
 # 使用方法
 
