@@ -13,7 +13,6 @@ import (
 	"github.com/gomodule/redigo/redis"
 
 	"git2.qingtingfm.com/infra/qt-boot/pkg/goroutine"
-	"git2.qingtingfm.com/infra/qt-boot/pkg/log"
 )
 
 type CacheUtil struct {
@@ -76,7 +75,7 @@ type BatchSetParams struct {
 func (cache *CacheUtil) BatchSet(ctx context.Context, params *BatchSetParams) (err error) {
 	defer func() {
 		if err != nil {
-			log.Errorc(ctx, "CacheUtil.BatchSet, error:%+v", err)
+			GetLogger().Errorf(ctx, "CacheUtil.BatchSet, error:%+v", err)
 		}
 	}()
 
@@ -126,7 +125,7 @@ func (cache *CacheUtil) BatchSet(ctx context.Context, params *BatchSetParams) (e
 func (cache *CacheUtil) GetCache(ctx context.Context, key string, value interface{}) (hit bool, err error) {
 	defer func() {
 		if err != nil {
-			log.Errorc(ctx, "CacheUtil.GetCache, error:%+v", errors.WithStack(err))
+			GetLogger().Errorf(ctx, "CacheUtil.GetCache, error:%+v", errors.WithStack(err))
 		}
 	}()
 
@@ -171,7 +170,7 @@ func (cache *CacheUtil) MGet(ctx context.Context,
 	keys []string, valuesInter interface{}) (hits []bool, err error) {
 	defer func() {
 		if err != nil {
-			log.Errorc(ctx, "CacheUtil.MGet, error:%+v", err)
+			GetLogger().Errorf(ctx, "CacheUtil.MGet, error:%+v", err)
 		}
 	}()
 
