@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/cclehui/redis-util/internal/base"
 	"github.com/cclehui/redis-util/internal/singleflight"
 	"github.com/pkg/errors"
 
 	"github.com/gomodule/redigo/redis"
-
-	"git2.qingtingfm.com/infra/qt-boot/pkg/goroutine"
 )
 
 type CacheUtil struct {
@@ -285,9 +284,8 @@ type WrapperParamsMget struct {
 	SetFuncSlice []MgetSetFunc    // 并发获取
 	BatchSetFunc MgetBatchSetFunc // 批量获取
 
-	SingleFlight     bool               // 是否启动 singleflight
-	FlushCache       bool               // 用SetFunc刷新缓存
-	GoroutineOptions []goroutine.Option // 非批量获取时有效
+	SingleFlight bool // 是否启动 singleflight
+	FlushCache   bool // 用SetFunc刷新缓存
 }
 
 // 多key 缓存获取wrapper mget
@@ -369,14 +367,33 @@ func (cache *CacheUtil) cacheWrapperMgetFallbackHandle(ctx context.Context,
 	}
 
 	// 并发获取
-	goGroup := goroutine.New("cacheWrapperMgetGoroutineGet", params.GoroutineOptions...)
+	wg := sync.WaitGroup{}
+	dataMutex := &sync.Mutex{}
 
-	for i, fallbackIndex := range fallbackIndexes {
-		goName := fmt.Sprintf("cacheWrapperMgetGoroutineGet_%d", i)
+	errGroup := make([]error, 0)
+
+	goPool, err := getGoPool()
+	if err != nil {
+		return err
+	}
+
+	for _, fallbackIndex := range fallbackIndexes {
 		fallbackIndex := fallbackIndex
 
-		goGroup.Go(ctx, goName, func(ctx context.Context) error {
+		wg.Add(1)
+
+		goPool.Submit(func() {
 			var err2 error
+
+			defer func() {
+				if err2 != nil {
+					dataMutex.Lock()
+					errGroup = append(errGroup, err2)
+					dataMutex.Unlock()
+				}
+				wg.Done()
+			}()
+
 			var newData interface{}
 			key := params.Keys[fallbackIndex]
 			targetResultRFValue := resultRFElem.Index(fallbackIndex)
@@ -390,12 +407,16 @@ func (cache *CacheUtil) cacheWrapperMgetFallbackHandle(ctx context.Context,
 			}
 
 			targetResultRFValue.Set(reflect.ValueOf(newData)) // 结果
-
-			return err2
 		})
 	}
 
-	return goGroup.Wait()
+	wg.Wait()
+
+	if len(errGroup) > 0 {
+		return errGroup[0]
+	}
+
+	return nil
 }
 
 // 批量获取 fallback 函数调用和入缓存

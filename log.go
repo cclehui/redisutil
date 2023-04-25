@@ -21,6 +21,7 @@ type LogData struct {
 type Logger interface {
 	Errorf(ctx context.Context, format string, args ...interface{})
 	Infof(ctx context.Context, format string, args ...interface{})
+	Printf(format string, args ...interface{})
 }
 
 var logger Logger = &DefaultLogger{}
@@ -42,6 +43,12 @@ func (l *DefaultLogger) Errorf(ctx context.Context, format string, args ...inter
 }
 
 func (l *DefaultLogger) Infof(ctx context.Context, format string, args ...interface{}) {
+	content := fmt.Sprintf(format, args...)
+	logStr, _ := json.Marshal(LogData{Level: LevelInfo, Content: content})
+	fmt.Println(string(logStr))
+}
+
+func (l *DefaultLogger) Printf(format string, args ...interface{}) {
 	content := fmt.Sprintf(format, args...)
 	logStr, _ := json.Marshal(LogData{Level: LevelInfo, Content: content})
 	fmt.Println(string(logStr))
