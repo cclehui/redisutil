@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	redisutil "github.com/cclehui/redis-util"
+	"github.com/cclehui/redisutil"
 	"github.com/gomodule/redigo/redis"
 )
 

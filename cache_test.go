@@ -313,6 +313,7 @@ func TestCacheWrapper(t *testing.T) {
 		}()
 
 		goGroup := goroutine.New("CacheUtilCacheWrapper")
+		goPool, err := getGoPool()
 
 		for j := 0; j < n; j++ { // N个并发
 			goName := fmt.Sprintf("CacheUtilCacheWrapper_%d", j)
@@ -406,8 +407,6 @@ func TestCacheWrapperMgetGoroutine(t *testing.T) {
 			ExpireSeconds: expireSeconds,
 			ResultSlice:   &dataResult,
 			SetFuncSlice:  setFuncSlice,
-
-			GoroutineOptions: []goroutine.Option{goroutine.SetMaxWorker(5, true)},
 		})
 
 		assert.Equal(t, nil, err)
@@ -494,8 +493,7 @@ func TestCacheWrapperMgetGoroutineSingleFlight(t *testing.T) {
 					ResultSlice:   &dataResult[j],
 					SetFuncSlice:  setFuncSlice,
 
-					SingleFlight:     true,
-					GoroutineOptions: []goroutine.Option{goroutine.SetMaxWorker(5, true)},
+					SingleFlight: true,
 				})
 			})
 		}

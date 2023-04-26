@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/cclehui/redis-util/internal/test"
+	"github.com/cclehui/redisutil/internal/test"
 	"github.com/gomodule/redigo/redis"
 )
 

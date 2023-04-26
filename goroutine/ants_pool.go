@@ -1,15 +1,16 @@
-package redisutil
+package goroutine
 
 import (
 	"sync"
 
+	"github.com/cclehui/redisutil/log"
 	"github.com/panjf2000/ants/v2"
 	"github.com/pkg/errors"
 )
 
-var goRoutineSize = 50
+var goRoutineSize = 500
 
-var goRoutineOptions = []ants.Option{ants.WithLogger(GetLogger())}
+var goRoutineOptions = []ants.Option{ants.WithLogger(log.GetLogger())}
 
 var goPool *ants.Pool
 var goPoolOnce = sync.Once{}
@@ -34,4 +35,7 @@ func SetGoRoutineSize(size int) {
 
 func SetGoRoutineOptions(options []ants.Option) {
 	goRoutineOptions = options
+}
+
+type ErrorGroup struct {
 }

@@ -1,4 +1,4 @@
-module github.com/cclehui/redis-util
+module github.com/cclehui/redisutil
 
 go 1.15
 

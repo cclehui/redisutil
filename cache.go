@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cclehui/redis-util/internal/base"
-	"github.com/cclehui/redis-util/internal/singleflight"
+	"github.com/cclehui/redisutil/internal/base"
+	"github.com/cclehui/redisutil/internal/singleflight"
 	"github.com/pkg/errors"
 
 	"github.com/gomodule/redigo/redis"

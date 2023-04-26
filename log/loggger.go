@@ -1,4 +1,4 @@
-package redisutil
+package log
 
 import (
 	"context"
