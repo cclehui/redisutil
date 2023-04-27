@@ -6,8 +6,8 @@ const (
 	TTLNoExpire = -1 // 不过期
 )
 
-type CacheSetFunc func() (interface{}, error)
+type FallbackFunc func() (interface{}, error)
 
-type MgetSetFunc func(fallbackIndex int) (interface{}, error)
+type MgetFallbackFunc func(fallbackIndex int) (interface{}, error)
 
-type MgetBatchSetFunc func(fallbackIndexes []int) (map[int]interface{}, error)
+type MgetBatchFallbackFunc func(fallbackIndexes []int) (map[int]interface{}, error)
