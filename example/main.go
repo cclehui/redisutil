@@ -29,7 +29,6 @@ func main() {
 
 	value, _ = redisUtil.Decr(ctx, cacheKey)
 	fmt.Println("Decr:", value)
-
 }
 
 func getTestPool() *redis.Pool {

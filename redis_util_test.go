@@ -123,7 +123,6 @@ func TestZSet(t *testing.T) {
 	value, err = redisUtil.ZCard(ctx, redisKey)
 	assert.Equal(t, nil, err)
 	assert.Equal(t, 0, int(value))
-
 }
 
 func TestBatchSet(t *testing.T) {
