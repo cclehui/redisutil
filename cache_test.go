@@ -16,7 +16,7 @@ func TestSetGet(t *testing.T) {
 	ctx := context.Background()
 
 	redisUtil := NewRedisUtil(getTestPool())
-	redisKey := "cclehui_test_set_get_key_211022"
+	redisKey := "gotest:cclehui_test_set_get_key_211022"
 
 	value := 1
 
@@ -63,7 +63,7 @@ func TestIncrDecr(t *testing.T) {
 	ctx := context.Background()
 
 	redisUtil := NewRedisUtil(getTestPool())
-	redisKey := "cclehui_test_incr_decr_key_211022"
+	redisKey := "gotest:cclehui_test_incr_decr_key_211022"
 
 	_ = redisUtil.DeleteCache(ctx, redisKey)
 
@@ -95,7 +95,7 @@ func TestZSet(t *testing.T) {
 	ctx := context.Background()
 
 	redisUtil := NewRedisUtil(getTestPool())
-	redisKey := "cclehui_test_zset"
+	redisKey := "goteset:cclehui_test_zset"
 
 	defer func() {
 		_ = redisUtil.DeleteCache(ctx, redisKey)
