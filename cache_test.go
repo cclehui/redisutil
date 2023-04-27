@@ -8,84 +8,84 @@ import (
 	"testing"
 	"time"
 
-	"git2.qingtingfm.com/infra/qt-boot/pkg/goroutine"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestSetGet(t *testing.T) {
 	ctx := context.Background()
 
-	cacheUtil := NewCacheUtil(getTestPool())
-	cacheKey := "cclehui_test_set_get_key_211022"
+	redisUtil := NewRedisUtil(getTestPool())
+	redisKey := "cclehui_test_set_get_key_211022"
 
 	value := 1
 
-	err := cacheUtil.SetCache(ctx, cacheKey, value, 3600)
+	err := redisUtil.SetCache(ctx, redisKey, value, 3600)
 	assert.Equal(t, err, nil)
 
-	_, _ = cacheUtil.GetCache(ctx, cacheKey, &value)
+	_, _ = redisUtil.GetCache(ctx, redisKey, &value)
 	assert.Equal(t, value, 1)
 
-	err = cacheUtil.DeleteCache(ctx, cacheKey)
+	err = redisUtil.DeleteCache(ctx, redisKey)
 	assert.Equal(t, err, nil)
 }
 
 func TestCacheUtilSet(t *testing.T) {
 	ctx := context.Background()
 
-	cacheUtil := NewCacheUtil(getTestPool())
+	redisUtil := NewRedisUtil(getTestPool())
 
-	key1 := "gotest:cache_util:set1"
+	key1 := "gotest:redis_util:set1"
 
 	data := "aaaaaaaaa"
 	ttl := TTLNoExpire
 
-	err := cacheUtil.SetCache(ctx, key1, data, ttl)
+	err := redisUtil.SetCache(ctx, key1, data, ttl)
 	assert.Equal(t, nil, err)
 
-	ttlFromRedis, err := cacheUtil.TTL(ctx, key1)
+	ttlFromRedis, err := redisUtil.TTL(ctx, key1)
 	assert.Equal(t, nil, err)
 	assert.Equal(t, TTLNoExpire, ttlFromRedis)
 
 	ttl = 600
 
-	err = cacheUtil.SetCache(ctx, key1, data, ttl)
+	err = redisUtil.SetCache(ctx, key1, data, ttl)
 	assert.Equal(t, nil, err)
 
-	ttlFromRedis, err = cacheUtil.TTL(ctx, key1)
+	ttlFromRedis, err = redisUtil.TTL(ctx, key1)
 	assert.Equal(t, nil, err)
 	assert.NotEqual(t, TTLNoExpire, ttlFromRedis)
 
-	_ = cacheUtil.DeleteCache(ctx, key1)
+	_ = redisUtil.DeleteCache(ctx, key1)
 }
 
 func TestIncrDecr(t *testing.T) {
 	ctx := context.Background()
 
-	cacheUtil := NewCacheUtil(getTestPool())
-	cacheKey := "cclehui_test_incr_decr_key_211022"
+	redisUtil := NewRedisUtil(getTestPool())
+	redisKey := "cclehui_test_incr_decr_key_211022"
 
-	_ = cacheUtil.DeleteCache(ctx, cacheKey)
+	_ = redisUtil.DeleteCache(ctx, redisKey)
 
-	_ = cacheUtil.SetCache(ctx, cacheKey, 1, 3600)
+	_ = redisUtil.SetCache(ctx, redisKey, 1, 3600)
 
-	value, _ := cacheUtil.Incr(ctx, cacheKey)
+	value, _ := redisUtil.Incr(ctx, redisKey)
 	assert.Equal(t, value, int64(2))
 
-	value, _ = cacheUtil.Decr(ctx, cacheKey)
+	value, _ = redisUtil.Decr(ctx, redisKey)
 	assert.Equal(t, value, int64(1))
 
-	value, _ = cacheUtil.IncrBy(ctx, cacheKey, 10)
+	value, _ = redisUtil.IncrBy(ctx, redisKey, 10)
 	assert.Equal(t, value, int64(11))
 
-	value, _ = cacheUtil.DecrBy(ctx, cacheKey, 10)
+	value, _ = redisUtil.DecrBy(ctx, redisKey, 10)
 	assert.Equal(t, value, int64(1))
 
-	// _ = cacheUtil.DeleteCache(ctx, cacheKey)
+	// _ = redisUtil.DeleteCache(ctx, redisKey)
 
-	_ = cacheUtil.Expire(ctx, cacheKey, 600)
+	_ = redisUtil.Expire(ctx, redisKey, 600)
 
-	ttl, _ := cacheUtil.TTL(ctx, cacheKey)
+	ttl, _ := redisUtil.TTL(ctx, redisKey)
 	if ttl < 0 || ttl > 600 {
 		t.Fatalf("ttl时间异常, %d", ttl)
 	}
@@ -94,11 +94,11 @@ func TestIncrDecr(t *testing.T) {
 func TestZSet(t *testing.T) {
 	ctx := context.Background()
 
-	cacheUtil := NewCacheUtil(getTestPool())
-	cacheKey := "cclehui_test_zset"
+	redisUtil := NewRedisUtil(getTestPool())
+	redisKey := "cclehui_test_zset"
 
 	defer func() {
-		_ = cacheUtil.DeleteCache(ctx, cacheKey)
+		_ = redisUtil.DeleteCache(ctx, redisKey)
 	}()
 
 	infos := []*SortSetInfo{
@@ -106,12 +106,12 @@ func TestZSet(t *testing.T) {
 		{Score: 8, Name: "22222222"},
 	}
 
-	err := cacheUtil.CacheZAdd(ctx, cacheKey, infos)
+	err := redisUtil.CacheZAdd(ctx, redisKey, infos)
 	assert.Equal(t, nil, err)
-	err = cacheUtil.CacheZAdd(ctx, cacheKey, infos)
+	err = redisUtil.CacheZAdd(ctx, redisKey, infos)
 	assert.Equal(t, nil, err)
 
-	value, err := cacheUtil.CacheZCard(ctx, cacheKey)
+	value, err := redisUtil.CacheZCard(ctx, redisKey)
 	assert.Equal(t, nil, err)
 	assert.Equal(t, len(infos), int(value))
 
@@ -120,10 +120,10 @@ func TestZSet(t *testing.T) {
 		deleteNames[i] = item.Name
 	}
 
-	err = cacheUtil.CacheZrem(ctx, cacheKey, deleteNames)
+	err = redisUtil.CacheZrem(ctx, redisKey, deleteNames)
 	assert.Equal(t, nil, err)
 
-	value, err = cacheUtil.CacheZCard(ctx, cacheKey)
+	value, err = redisUtil.CacheZCard(ctx, redisKey)
 	assert.Equal(t, nil, err)
 	assert.Equal(t, 0, int(value))
 
@@ -132,10 +132,10 @@ func TestZSet(t *testing.T) {
 func TestBatchSet(t *testing.T) {
 	ctx := context.Background()
 
-	cacheUtil := NewCacheUtil(getTestPool())
+	redisUtil := NewRedisUtil(getTestPool())
 
-	key1 := "gotest:cache_util:TestCacheUtilBatchSet1"
-	key2 := "gotest:cache_util:TestCacheUtilBatchSet2"
+	key1 := "gotest:redis_util:TestCacheUtilBatchSet1"
+	key2 := "gotest:redis_util:TestCacheUtilBatchSet2"
 
 	data := "aaaaaaaaa"
 
@@ -143,13 +143,13 @@ func TestBatchSet(t *testing.T) {
 	values := []interface{}{data, data}
 	expireSecondsSlice := []int{600, 900}
 
-	err := cacheUtil.BatchSet(ctx, &BatchSetParams{
+	err := redisUtil.BatchSet(ctx, &BatchSetParams{
 		Keys: keys, Values: values, ExpireSecondsSlice: expireSecondsSlice})
 	assert.Equal(t, nil, err)
 
 	mgetResult := make([]string, len(keys))
 
-	hits, err := cacheUtil.MGet(ctx, keys, &mgetResult)
+	hits, err := redisUtil.MGet(ctx, keys, &mgetResult)
 	assert.Equal(t, nil, err)
 	assert.Equal(t, len(keys), len(hits))
 
@@ -159,16 +159,16 @@ func TestBatchSet(t *testing.T) {
 	}
 
 	for _, key := range keys {
-		_ = cacheUtil.DeleteCache(ctx, key)
+		_ = redisUtil.DeleteCache(ctx, key)
 	}
 }
 
 func TestMGet(t *testing.T) {
 	ctx := context.Background()
-	cacheUtil := NewCacheUtil(getTestPool())
+	redisUtil := NewRedisUtil(getTestPool())
 
-	key1 := "gotest:cache_util:mget1"
-	key2 := "gotest:cache_util:mget2"
+	key1 := "gotest:redis_util:mget1"
+	key2 := "gotest:redis_util:mget2"
 
 	data := "aaaaaaaaa"
 	ttl := 600
@@ -177,10 +177,10 @@ func TestMGet(t *testing.T) {
 	length := 2
 	mgetResult := make([]string, length)
 
-	err := cacheUtil.SetCache(ctx, keys[0], data, ttl)
+	err := redisUtil.SetCache(ctx, keys[0], data, ttl)
 	assert.Equal(t, nil, err)
 
-	hits, err := cacheUtil.MGet(ctx, keys, &mgetResult)
+	hits, err := redisUtil.MGet(ctx, keys, &mgetResult)
 	assert.Equal(t, nil, err)
 
 	assert.Equal(t, 2, len(hits))
@@ -193,7 +193,7 @@ func TestMGet(t *testing.T) {
 
 	// 都没有获取到
 	mgetResultNil := make([]string, length)
-	hits, err = cacheUtil.MGet(ctx, []string{"gotest:xxxxxxxxx", "gotest:yyyyyyy"}, &mgetResultNil)
+	hits, err = redisUtil.MGet(ctx, []string{"gotest:xxxxxxxxx", "gotest:yyyyyyy"}, &mgetResultNil)
 
 	assert.Equal(t, nil, err)
 	assert.Equal(t, false, hits[0])
@@ -202,16 +202,16 @@ func TestMGet(t *testing.T) {
 	fmt.Printf("2222222222, %+v, %+v\n", hits, mgetResultNil)
 
 	for _, key := range keys {
-		_ = cacheUtil.DeleteCache(ctx, key)
+		_ = redisUtil.DeleteCache(ctx, key)
 	}
 }
 
 func TestMGetStruct(t *testing.T) {
 	ctx := context.Background()
-	cacheUtil := NewCacheUtil(getTestPool())
+	redisUtil := NewRedisUtil(getTestPool())
 
-	key1 := "gotest:cache_util:mget1"
-	key2 := "gotest:cache_util:mget2"
+	key1 := "gotest:redis_util:mget1"
+	key2 := "gotest:redis_util:mget2"
 
 	type valueStruct struct {
 		Name string
@@ -224,12 +224,12 @@ func TestMGetStruct(t *testing.T) {
 	keys := []string{key1, key2}
 	length := len(keys)
 
-	err := cacheUtil.SetCache(ctx, keys[0], data, ttl)
+	err := redisUtil.SetCache(ctx, keys[0], data, ttl)
 	assert.Equal(t, nil, err)
 
 	mgetResult := make([]valueStruct, length) // 非指针形式
 
-	hits, err := cacheUtil.MGet(ctx, keys, &mgetResult)
+	hits, err := redisUtil.MGet(ctx, keys, &mgetResult)
 	assert.Equal(t, nil, err)
 
 	assert.Equal(t, len(keys), len(hits))
@@ -242,7 +242,7 @@ func TestMGetStruct(t *testing.T) {
 
 	mgetResult2 := make([]*valueStruct, length) // 指针形式
 
-	hits2, err2 := cacheUtil.MGet(ctx, keys, &mgetResult2)
+	hits2, err2 := redisUtil.MGet(ctx, keys, &mgetResult2)
 	assert.Equal(t, nil, err2)
 
 	assert.Equal(t, len(keys), len(hits2))
@@ -253,15 +253,15 @@ func TestMGetStruct(t *testing.T) {
 	assert.Nil(t, mgetResult2[1])
 
 	for _, key := range keys {
-		_ = cacheUtil.DeleteCache(ctx, key)
+		_ = redisUtil.DeleteCache(ctx, key)
 	}
 }
 
 func TestCacheWrapper(t *testing.T) {
 	ctx := context.Background()
 
-	cacheUtil := NewCacheUtil(getTestPool())
-	key := "gotest:cache_wrapper:get"
+	redisUtil := NewRedisUtil(getTestPool())
+	key := "gotest:redis_wrapper:get"
 
 	type valueStruct struct {
 		Name string
@@ -309,14 +309,12 @@ func TestCacheWrapper(t *testing.T) {
 		dataResult := make([]*valueStruct, n)
 
 		defer func() {
-			_ = cacheUtil.DeleteCache(ctx, key)
+			_ = redisUtil.DeleteCache(ctx, key)
 		}()
 
-		goGroup := goroutine.New("CacheUtilCacheWrapper")
-		goPool, err := getGoPool()
+		goGroup, _ := errgroup.WithContext(ctx)
 
 		for j := 0; j < n; j++ { // N个并发
-			goName := fmt.Sprintf("CacheUtilCacheWrapper_%d", j)
 			j := j
 			paramsTemp := &WrapperParams{
 				Key:           params.Key,
@@ -329,8 +327,8 @@ func TestCacheWrapper(t *testing.T) {
 			}
 			paramsTemp.Result = &dataResult[j]
 
-			goGroup.Go(ctx, goName, func(ctx context.Context) error {
-				return cacheUtil.CacheWrapper(ctx, paramsTemp)
+			goGroup.Go(func() error {
+				return redisUtil.CacheWrapper(ctx, paramsTemp)
 			})
 		}
 
@@ -361,10 +359,10 @@ func TestCacheWrapper(t *testing.T) {
 func TestCacheWrapperMgetGoroutine(t *testing.T) {
 	ctx := context.Background()
 
-	cacheUtil := NewCacheUtil(getTestPool())
+	redisUtil := NewRedisUtil(getTestPool())
 
-	key1 := "gotest:cache_util:mget1"
-	key2 := "gotest:cache_util:mget2"
+	key1 := "gotest:redis_util:mget1"
+	key2 := "gotest:redis_util:mget2"
 
 	type valueStruct struct {
 		Name          string
@@ -402,7 +400,7 @@ func TestCacheWrapperMgetGoroutine(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		dataResult := make([]*valueStruct, length) // 指针形式
 
-		err := cacheUtil.CacheWrapperMget(ctx, &WrapperParamsMget{
+		err := redisUtil.CacheWrapperMget(ctx, &WrapperParamsMget{
 			Keys:          keys,
 			ExpireSeconds: expireSeconds,
 			ResultSlice:   &dataResult,
@@ -421,22 +419,22 @@ func TestCacheWrapperMgetGoroutine(t *testing.T) {
 		fmt.Printf("%s, %+v, %s\n", logPrefix, dataResult, string(resultLogPtr))
 
 		if i == 0 {
-			_ = cacheUtil.DeleteCache(ctx, key1)
+			_ = redisUtil.DeleteCache(ctx, key1)
 		}
 	}
 
 	for _, key := range keys {
-		_ = cacheUtil.DeleteCache(ctx, key)
+		_ = redisUtil.DeleteCache(ctx, key)
 	}
 }
 
 func TestCacheWrapperMgetGoroutineSingleFlight(t *testing.T) {
 	ctx := context.Background()
 
-	cacheUtil := NewCacheUtil(getTestPool())
+	redisUtil := NewRedisUtil(getTestPool())
 
-	key1 := "gotest:cache_util:mget1"
-	key2 := "gotest:cache_util:mget2"
+	key1 := "gotest:redis_util:mget1"
+	key2 := "gotest:redis_util:mget2"
 
 	type valueStruct struct {
 		Name          string
@@ -480,14 +478,13 @@ func TestCacheWrapperMgetGoroutineSingleFlight(t *testing.T) {
 			dataResult[j] = make([]*valueStruct, length) // 指针形式
 		}
 
-		goGroup := goroutine.New("CacheWrapperMgetGoroutineSingleFlight")
+		goGroup, _ := errgroup.WithContext(ctx)
 
 		for j := 0; j < n; j++ { // N个并发
-			goName := fmt.Sprintf("CacheWrapperMgetGoroutineSingleFlight_%d", j)
 			j := j
 
-			goGroup.Go(ctx, goName, func(ctx context.Context) error {
-				return cacheUtil.CacheWrapperMget(ctx, &WrapperParamsMget{
+			goGroup.Go(func() error {
+				return redisUtil.CacheWrapperMget(ctx, &WrapperParamsMget{
 					Keys:          keys,
 					ExpireSeconds: expireSeconds,
 					ResultSlice:   &dataResult[j],
@@ -509,22 +506,22 @@ func TestCacheWrapperMgetGoroutineSingleFlight(t *testing.T) {
 		}
 
 		if i == 0 {
-			_ = cacheUtil.DeleteCache(ctx, key1)
+			_ = redisUtil.DeleteCache(ctx, key1)
 		}
 	}
 
 	for _, key := range keys {
-		_ = cacheUtil.DeleteCache(ctx, key)
+		_ = redisUtil.DeleteCache(ctx, key)
 	}
 }
 
 func TestCacheWrapperMgetBatch(t *testing.T) {
 	ctx := context.Background()
 
-	cacheUtil := NewCacheUtil(getTestPool())
+	redisUtil := NewRedisUtil(getTestPool())
 
-	key1 := "gotest:cache_util:mget1"
-	key2 := "gotest:cache_util:mget2"
+	key1 := "gotest:redis_util:mget1"
+	key2 := "gotest:redis_util:mget2"
 
 	type valueStruct struct {
 		Name          string
@@ -561,7 +558,7 @@ func TestCacheWrapperMgetBatch(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		dataResult := make([]*valueStruct, length) // 指针形式
 
-		err := cacheUtil.CacheWrapperMget(ctx, &WrapperParamsMget{
+		err := redisUtil.CacheWrapperMget(ctx, &WrapperParamsMget{
 			Keys:          keys,
 			ExpireSeconds: expireSeconds,
 			ResultSlice:   &dataResult,
@@ -580,22 +577,22 @@ func TestCacheWrapperMgetBatch(t *testing.T) {
 		fmt.Printf("%s,获取结果, %+v, %s\n", logPrefix, dataResult, string(resultLogPtr))
 
 		if i == 0 {
-			_ = cacheUtil.DeleteCache(ctx, key1)
+			_ = redisUtil.DeleteCache(ctx, key1)
 		}
 	}
 
 	for _, key := range keys {
-		_ = cacheUtil.DeleteCache(ctx, key)
+		_ = redisUtil.DeleteCache(ctx, key)
 	}
 }
 
 func TestCacheWrapperMgetBatchSingleFlight(t *testing.T) {
 	ctx := context.Background()
 
-	cacheUtil := NewCacheUtil(getTestPool())
+	redisUtil := NewRedisUtil(getTestPool())
 
-	key1 := "gotest:cache_util:mget1"
-	key2 := "gotest:cache_util:mget2"
+	key1 := "gotest:redis_util:mget1"
+	key2 := "gotest:redis_util:mget2"
 
 	type valueStruct struct {
 		Name          string
@@ -639,14 +636,13 @@ func TestCacheWrapperMgetBatchSingleFlight(t *testing.T) {
 			dataResult[j] = make([]*valueStruct, length) // 指针形式
 		}
 
-		goGroup := goroutine.New("CacheWrapperMgetGoroutineSingleFlight")
+		goGroup, _ := errgroup.WithContext(ctx)
 
 		for j := 0; j < n; j++ { // N个并发
-			goName := fmt.Sprintf("CacheWrapperMgetGoroutineSingleFlight_%d", j)
 			j := j
 
-			goGroup.Go(ctx, goName, func(ctx context.Context) error {
-				return cacheUtil.CacheWrapperMget(ctx, &WrapperParamsMget{
+			goGroup.Go(func() error {
+				return redisUtil.CacheWrapperMget(ctx, &WrapperParamsMget{
 					Keys:          keys,
 					ExpireSeconds: expireSeconds,
 					ResultSlice:   &dataResult[j],
@@ -668,11 +664,11 @@ func TestCacheWrapperMgetBatchSingleFlight(t *testing.T) {
 		}
 
 		if i == 0 {
-			_ = cacheUtil.DeleteCache(ctx, key1)
+			_ = redisUtil.DeleteCache(ctx, key1)
 		}
 	}
 
 	for _, key := range keys {
-		_ = cacheUtil.DeleteCache(ctx, key)
+		_ = redisUtil.DeleteCache(ctx, key)
 	}
 }

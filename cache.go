@@ -5,23 +5,25 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"sync"
 
 	"github.com/cclehui/redisutil/internal/base"
 	"github.com/cclehui/redisutil/internal/singleflight"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/gomodule/redigo/redis"
 )
 
-type CacheUtil struct {
+type RedisUtil struct {
 	pool *redis.Pool
 
 	singleFlightGroupNum int
+
+	logger Logger
 }
 
-func NewCacheUtil(pool *redis.Pool, options ...Option) *CacheUtil {
-	result := &CacheUtil{pool: pool}
+func NewRedisUtil(pool *redis.Pool, options ...Option) *RedisUtil {
+	result := &RedisUtil{pool: pool}
 
 	for _, option := range options {
 		option.Apply(result)
@@ -30,7 +32,7 @@ func NewCacheUtil(pool *redis.Pool, options ...Option) *CacheUtil {
 	return result
 }
 
-func (cache *CacheUtil) SetCache(ctx context.Context, key string, value interface{}, ttl int) (err error) {
+func (ru *RedisUtil) SetCache(ctx context.Context, key string, value interface{}, ttl int) (err error) {
 	// 判断是否整数
 	var bytesData []byte
 
@@ -44,7 +46,7 @@ func (cache *CacheUtil) SetCache(ctx context.Context, key string, value interfac
 		}
 	}
 
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		if ttl == TTLNoExpire { // 不过期
 			_, err = conDo(ctx, con, "SET", keyPatch(key), bytesData)
 		} else {
@@ -71,10 +73,10 @@ type BatchSetParams struct {
 	ExpireSecondsSlice []int
 }
 
-func (cache *CacheUtil) BatchSet(ctx context.Context, params *BatchSetParams) (err error) {
+func (ru *RedisUtil) BatchSet(ctx context.Context, params *BatchSetParams) (err error) {
 	defer func() {
 		if err != nil {
-			GetLogger().Errorf(ctx, "CacheUtil.BatchSet, error:%+v", err)
+			ru.getLogger().Errorf(ctx, "CacheUtil.BatchSet, error:%+v", err)
 		}
 	}()
 
@@ -83,7 +85,7 @@ func (cache *CacheUtil) BatchSet(ctx context.Context, params *BatchSetParams) (e
 		return errors.New("Keys Values ExpireSecondsSlice length is not equal")
 	}
 
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		for i, key := range params.Keys {
 			value := params.Values[i]
 			expireSeconds := params.ExpireSecondsSlice[i]
@@ -121,10 +123,10 @@ func (cache *CacheUtil) BatchSet(ctx context.Context, params *BatchSetParams) (e
 	return nil
 }
 
-func (cache *CacheUtil) GetCache(ctx context.Context, key string, value interface{}) (hit bool, err error) {
+func (ru *RedisUtil) GetCache(ctx context.Context, key string, value interface{}) (hit bool, err error) {
 	defer func() {
 		if err != nil {
-			GetLogger().Errorf(ctx, "CacheUtil.GetCache, error:%+v", errors.WithStack(err))
+			ru.getLogger().Errorf(ctx, "CacheUtil.GetCache, error:%+v", errors.WithStack(err))
 		}
 	}()
 
@@ -134,7 +136,7 @@ func (cache *CacheUtil) GetCache(ctx context.Context, key string, value interfac
 
 	var replay []byte
 
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		replay, err = redis.Bytes(conDo(ctx, con, "GET", keyPatch(key)))
 
 		if err != nil {
@@ -165,11 +167,11 @@ func (cache *CacheUtil) GetCache(ctx context.Context, key string, value interfac
 	return true, nil
 }
 
-func (cache *CacheUtil) MGet(ctx context.Context,
+func (ru *RedisUtil) MGet(ctx context.Context,
 	keys []string, valuesInter interface{}) (hits []bool, err error) {
 	defer func() {
 		if err != nil {
-			GetLogger().Errorf(ctx, "CacheUtil.MGet, error:%+v", err)
+			ru.getLogger().Errorf(ctx, "CacheUtil.MGet, error:%+v", err)
 		}
 	}()
 
@@ -191,7 +193,7 @@ func (cache *CacheUtil) MGet(ctx context.Context,
 	var redisResult [][]byte
 
 	// mget 没有命中key的情况下err 也是nil
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		redisResult, err = redis.ByteSlices(conDo(ctx, con, "MGET", keysPatch(keys)...))
 
 		if err != nil {
@@ -234,10 +236,10 @@ type WrapperParams struct {
 	FlushCache   bool // 是否用SetFunc刷新缓存
 }
 
-func (cache *CacheUtil) CacheWrapper(ctx context.Context,
+func (ru *RedisUtil) CacheWrapper(ctx context.Context,
 	params *WrapperParams) (err error) {
 	if !params.FlushCache {
-		if hit, _ := cache.GetCache(ctx, params.Key, params.Result); hit {
+		if hit, _ := ru.GetCache(ctx, params.Key, params.Result); hit {
 			return nil
 		}
 	} else if reflect.ValueOf(params.Result).Kind() != reflect.Ptr {
@@ -247,11 +249,11 @@ func (cache *CacheUtil) CacheWrapper(ctx context.Context,
 	var newData interface{}
 
 	if params.SingleFlight {
-		newData, err, _ = cache.singleflightGroup(params.Key).Do(params.Key, func() (interface{}, error) {
-			return cache.cWrapperCallAndSetCache(ctx, params)
+		newData, err, _ = ru.singleflightGroup(params.Key).Do(params.Key, func() (interface{}, error) {
+			return ru.cWrapperCallAndSetCache(ctx, params)
 		})
 	} else {
-		newData, err = cache.cWrapperCallAndSetCache(ctx, params)
+		newData, err = ru.cWrapperCallAndSetCache(ctx, params)
 	}
 
 	if err != nil {
@@ -264,14 +266,14 @@ func (cache *CacheUtil) CacheWrapper(ctx context.Context,
 	return err
 }
 
-func (cache *CacheUtil) cWrapperCallAndSetCache(ctx context.Context,
+func (ru *RedisUtil) cWrapperCallAndSetCache(ctx context.Context,
 	params *WrapperParams) (interface{}, error) {
 	data, err := params.SetFunc()
 	if err != nil {
 		return nil, err
 	}
 
-	_ = cache.SetCache(ctx, params.Key, data, params.ExpireSeconds)
+	_ = ru.SetCache(ctx, params.Key, data, params.ExpireSeconds)
 
 	return data, nil
 }
@@ -289,7 +291,7 @@ type WrapperParamsMget struct {
 }
 
 // 多key 缓存获取wrapper mget
-func (cache *CacheUtil) CacheWrapperMget(ctx context.Context,
+func (ru *RedisUtil) CacheWrapperMget(ctx context.Context,
 	params *WrapperParamsMget) (err error) {
 	if len(params.Keys) != len(params.ExpireSeconds) {
 		return errors.New("Keys, ExpireSeconds length should equal")
@@ -303,7 +305,7 @@ func (cache *CacheUtil) CacheWrapperMget(ctx context.Context,
 	hits := make([]bool, len(params.Keys))
 
 	if !params.FlushCache { // 从缓存中获取 mget
-		if hits, err = cache.MGet(ctx, params.Keys, params.ResultSlice); err != nil {
+		if hits, err = ru.MGet(ctx, params.Keys, params.ResultSlice); err != nil {
 			return err
 		}
 	}
@@ -323,12 +325,12 @@ func (cache *CacheUtil) CacheWrapperMget(ctx context.Context,
 	resultRFElem := reflect.ValueOf(params.ResultSlice).Elem() // 结果
 
 	// 未命中缓存的处理 批量获取或并发获取
-	err = cache.cacheWrapperMgetFallbackHandle(ctx, fallbackIndexes, resultRFElem, params)
+	err = ru.ruWrapperMgetFallbackHandle(ctx, fallbackIndexes, resultRFElem, params)
 
 	return err
 }
 
-func (cache *CacheUtil) cacheWrapperMgetFallbackHandle(ctx context.Context,
+func (ru *RedisUtil) ruWrapperMgetFallbackHandle(ctx context.Context,
 	fallbackIndexes []int, resultRFElem reflect.Value, params *WrapperParamsMget) (err error) {
 	if params.BatchSetFunc != nil { // 批量获取
 		var (
@@ -338,9 +340,9 @@ func (cache *CacheUtil) cacheWrapperMgetFallbackHandle(ctx context.Context,
 
 		if params.SingleFlight {
 			singleflightKey := strings.Join(params.Keys, ",")
-			batchDataInter, err2, _ = cache.singleflightGroup(singleflightKey).
+			batchDataInter, err2, _ = ru.singleflightGroup(singleflightKey).
 				Do(singleflightKey, func() (interface{}, error) {
-					return cache.cacheWrapperBatchCallAndSetCache(ctx, params, fallbackIndexes)
+					return ru.ruWrapperBatchCallAndSetCache(ctx, params, fallbackIndexes)
 				})
 		} else {
 			batchDataInter, err2 = params.BatchSetFunc(fallbackIndexes)
@@ -367,60 +369,37 @@ func (cache *CacheUtil) cacheWrapperMgetFallbackHandle(ctx context.Context,
 	}
 
 	// 并发获取
-	wg := sync.WaitGroup{}
-	dataMutex := &sync.Mutex{}
-
-	errGroup := make([]error, 0)
-
-	goPool, err := getGoPool()
-	if err != nil {
-		return err
-	}
+	goGroup, _ := errgroup.WithContext(ctx)
 
 	for _, fallbackIndex := range fallbackIndexes {
 		fallbackIndex := fallbackIndex
 
-		wg.Add(1)
-
-		goPool.Submit(func() {
+		goGroup.Go(func() error {
 			var err2 error
-
-			defer func() {
-				if err2 != nil {
-					dataMutex.Lock()
-					errGroup = append(errGroup, err2)
-					dataMutex.Unlock()
-				}
-				wg.Done()
-			}()
 
 			var newData interface{}
 			key := params.Keys[fallbackIndex]
 			targetResultRFValue := resultRFElem.Index(fallbackIndex)
 
 			if params.SingleFlight {
-				newData, err2, _ = cache.singleflightGroup(key).Do(key, func() (interface{}, error) {
-					return cache.cacheWrapperCallAndSetCache(ctx, params, fallbackIndex)
+				newData, err2, _ = ru.singleflightGroup(key).Do(key, func() (interface{}, error) {
+					return ru.ruWrapperCallAndSetCache(ctx, params, fallbackIndex)
 				})
 			} else {
-				newData, err2 = cache.cacheWrapperCallAndSetCache(ctx, params, fallbackIndex)
+				newData, err2 = ru.ruWrapperCallAndSetCache(ctx, params, fallbackIndex)
 			}
 
 			targetResultRFValue.Set(reflect.ValueOf(newData)) // 结果
+
+			return err2
 		})
 	}
 
-	wg.Wait()
-
-	if len(errGroup) > 0 {
-		return errGroup[0]
-	}
-
-	return nil
+	return goGroup.Wait()
 }
 
 // 批量获取 fallback 函数调用和入缓存
-func (cache *CacheUtil) cacheWrapperBatchCallAndSetCache(ctx context.Context,
+func (ru *RedisUtil) ruWrapperBatchCallAndSetCache(ctx context.Context,
 	params *WrapperParamsMget, fallbackIndexes []int) (map[int]interface{}, error) {
 	batchData, err := params.BatchSetFunc(fallbackIndexes)
 	if err != nil {
@@ -443,7 +422,7 @@ func (cache *CacheUtil) cacheWrapperBatchCallAndSetCache(ctx context.Context,
 	}
 
 	if len(setKeys) > 0 {
-		_ = cache.BatchSet(ctx, &BatchSetParams{
+		_ = ru.BatchSet(ctx, &BatchSetParams{
 			Keys: setKeys, Values: setValues, ExpireSecondsSlice: setExpireSecondsSlice,
 		})
 	}
@@ -452,7 +431,7 @@ func (cache *CacheUtil) cacheWrapperBatchCallAndSetCache(ctx context.Context,
 }
 
 // 并发获取 fallback 函数调用和入缓存
-func (cache *CacheUtil) cacheWrapperCallAndSetCache(ctx context.Context,
+func (ru *RedisUtil) ruWrapperCallAndSetCache(ctx context.Context,
 	params *WrapperParamsMget, fallbackIndex int) (interface{}, error) {
 	key := params.Keys[fallbackIndex]
 	expireSeconds := params.ExpireSeconds[fallbackIndex]
@@ -463,15 +442,15 @@ func (cache *CacheUtil) cacheWrapperCallAndSetCache(ctx context.Context,
 		return nil, err
 	}
 
-	_ = cache.SetCache(ctx, key, data, expireSeconds)
+	_ = ru.SetCache(ctx, key, data, expireSeconds)
 
 	return data, nil
 }
 
 // 默认10组, 应该够用了，只是内存操作的lock
-func (cache *CacheUtil) singleflightGroup(key string) *singleflight.Group {
+func (ru *RedisUtil) singleflightGroup(key string) *singleflight.Group {
 	keyHash := base.CRC32(key)
-	totalNum := cache.singleFlightGroupNum
+	totalNum := ru.singleFlightGroupNum
 
 	if totalNum < 1 {
 		totalNum = DefaultSingleFlightGroupNum
@@ -480,8 +459,8 @@ func (cache *CacheUtil) singleflightGroup(key string) *singleflight.Group {
 	return singleflight.GetGroup(fmt.Sprintf("CacheUtil:%d", keyHash%uint32(totalNum)))
 }
 
-func (cache *CacheUtil) DeleteCache(ctx context.Context, key string) (err error) {
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+func (ru *RedisUtil) DeleteCache(ctx context.Context, key string) (err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		_, err = conDo(ctx, con, "DEL", keyPatch(key))
 
 		return err
@@ -490,8 +469,8 @@ func (cache *CacheUtil) DeleteCache(ctx context.Context, key string) (err error)
 	return err
 }
 
-func (cache *CacheUtil) Expire(ctx context.Context, key string, ttl int) (err error) {
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+func (ru *RedisUtil) Expire(ctx context.Context, key string, ttl int) (err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		_, err = conDo(ctx, con, "EXPIRE", keyPatch(key), ttl)
 
 		return err
@@ -500,8 +479,8 @@ func (cache *CacheUtil) Expire(ctx context.Context, key string, ttl int) (err er
 	return err
 }
 
-func (cache *CacheUtil) TTL(ctx context.Context, key string) (ttl int, err error) {
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+func (ru *RedisUtil) TTL(ctx context.Context, key string) (ttl int, err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		ttl, err = redis.Int(conDo(ctx, con, "TTL", keyPatch(key)))
 
 		return err
@@ -510,8 +489,8 @@ func (cache *CacheUtil) TTL(ctx context.Context, key string) (ttl int, err error
 	return ttl, err
 }
 
-func (cache *CacheUtil) Incr(ctx context.Context, key string) (res int64, err error) {
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+func (ru *RedisUtil) Incr(ctx context.Context, key string) (res int64, err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		res, err = redis.Int64(conDo(ctx, con, "INCR", keyPatch(key)))
 
 		return err
@@ -520,8 +499,8 @@ func (cache *CacheUtil) Incr(ctx context.Context, key string) (res int64, err er
 	return res, err
 }
 
-func (cache *CacheUtil) IncrBy(ctx context.Context, key string, diff int64) (res int64, err error) {
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+func (ru *RedisUtil) IncrBy(ctx context.Context, key string, diff int64) (res int64, err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		res, err = redis.Int64(conDo(ctx, con, "INCRBY", keyPatch(key), diff))
 
 		return err
@@ -530,8 +509,8 @@ func (cache *CacheUtil) IncrBy(ctx context.Context, key string, diff int64) (res
 	return res, err
 }
 
-func (cache *CacheUtil) Decr(ctx context.Context, key string) (res int64, err error) {
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+func (ru *RedisUtil) Decr(ctx context.Context, key string) (res int64, err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		res, err = redis.Int64(conDo(ctx, con, "DECR", keyPatch(key)))
 
 		return err
@@ -540,8 +519,8 @@ func (cache *CacheUtil) Decr(ctx context.Context, key string) (res int64, err er
 	return res, err
 }
 
-func (cache *CacheUtil) DecrBy(ctx context.Context, key string, diff int64) (res int64, err error) {
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+func (ru *RedisUtil) DecrBy(ctx context.Context, key string, diff int64) (res int64, err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		res, err = redis.Int64(conDo(ctx, con, "DECRBY", keyPatch(key), diff))
 
 		return err
@@ -555,7 +534,7 @@ type SortSetInfo struct {
 	Name  string
 }
 
-func (cache *CacheUtil) CacheZAdd(ctx context.Context, key string, infos []*SortSetInfo) (err error) {
+func (ru *RedisUtil) CacheZAdd(ctx context.Context, key string, infos []*SortSetInfo) (err error) {
 	args := make([]interface{}, 0)
 	args = append(args, keyPatch(key))
 
@@ -563,7 +542,7 @@ func (cache *CacheUtil) CacheZAdd(ctx context.Context, key string, infos []*Sort
 		args = append(args, item.Score, item.Name)
 	}
 
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		_, err = conDo(ctx, con, "ZADD", args...)
 
 		if err != nil {
@@ -580,8 +559,8 @@ func (cache *CacheUtil) CacheZAdd(ctx context.Context, key string, infos []*Sort
 	return nil
 }
 
-func (cache *CacheUtil) CacheZCard(ctx context.Context, key string) (res int64, err error) {
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+func (ru *RedisUtil) CacheZCard(ctx context.Context, key string) (res int64, err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		res, err = redis.Int64(conDo(ctx, con, "ZCARD", keyPatch(key)))
 
 		return err
@@ -590,8 +569,8 @@ func (cache *CacheUtil) CacheZCard(ctx context.Context, key string) (res int64, 
 	return res, err
 }
 
-func (cache *CacheUtil) CacheZRangeKeys(ctx context.Context, key string, start, end int) (result []string, err error) {
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+func (ru *RedisUtil) CacheZRangeKeys(ctx context.Context, key string, start, end int) (result []string, err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		result, err = redis.Strings(conDo(ctx, con, "ZRANGE", keyPatch(key), start, end))
 
 		if err != nil {
@@ -608,8 +587,8 @@ func (cache *CacheUtil) CacheZRangeKeys(ctx context.Context, key string, start, 
 	return result, nil
 }
 
-func (cache *CacheUtil) CacheZRevRangeKeys(ctx context.Context, key string, start, end int) (result []string, err error) {
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+func (ru *RedisUtil) CacheZRevRangeKeys(ctx context.Context, key string, start, end int) (result []string, err error) {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		result, err = redis.Strings(conDo(ctx, con, "ZREVRANGE", keyPatch(key), start, end))
 
 		if err != nil {
@@ -626,7 +605,7 @@ func (cache *CacheUtil) CacheZRevRangeKeys(ctx context.Context, key string, star
 	return result, nil
 }
 
-func (cache *CacheUtil) CacheZrem(ctx context.Context, key string, names []string) (err error) {
+func (ru *RedisUtil) CacheZrem(ctx context.Context, key string, names []string) (err error) {
 	args := make([]interface{}, 0)
 	args = append(args, keyPatch(key))
 
@@ -634,7 +613,7 @@ func (cache *CacheUtil) CacheZrem(ctx context.Context, key string, names []strin
 		args = append(args, item)
 	}
 
-	err = cache.WrapDo(ctx, func(con redis.Conn) error {
+	err = ru.WrapDo(ctx, func(con redis.Conn) error {
 		_, err = conDo(ctx, con, "ZREM", args...)
 
 		if err != nil {
@@ -651,9 +630,17 @@ func (cache *CacheUtil) CacheZrem(ctx context.Context, key string, names []strin
 	return nil
 }
 
-func (cache *CacheUtil) WrapDo(ctx context.Context, doFunction func(con redis.Conn) error) error {
-	con := cache.pool.Get()
+func (ru *RedisUtil) WrapDo(ctx context.Context, doFunction func(con redis.Conn) error) error {
+	con := ru.pool.Get()
 	defer con.Close()
 
 	return doFunction(con)
+}
+
+func (ru *RedisUtil) getLogger() Logger {
+	if ru.logger != nil {
+		return ru.logger
+	}
+
+	return GetDefaultLogger()
 }

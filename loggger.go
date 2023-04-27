@@ -1,4 +1,4 @@
-package log
+package redisutil
 
 import (
 	"context"
@@ -21,17 +21,16 @@ type LogData struct {
 type Logger interface {
 	Errorf(ctx context.Context, format string, args ...interface{})
 	Infof(ctx context.Context, format string, args ...interface{})
-	Printf(format string, args ...interface{})
 }
 
-var logger Logger = &DefaultLogger{}
+var defaultLogger Logger = &DefaultLogger{}
 
-func GetLogger() Logger {
-	return logger
+func GetDefaultLogger() Logger {
+	return defaultLogger
 }
 
-func SetLogger(newLogger Logger) {
-	logger = newLogger
+func SetDefaultLogger(newLogger Logger) {
+	defaultLogger = newLogger
 }
 
 type DefaultLogger struct{}
@@ -43,12 +42,6 @@ func (l *DefaultLogger) Errorf(ctx context.Context, format string, args ...inter
 }
 
 func (l *DefaultLogger) Infof(ctx context.Context, format string, args ...interface{}) {
-	content := fmt.Sprintf(format, args...)
-	logStr, _ := json.Marshal(LogData{Level: LevelInfo, Content: content})
-	fmt.Println(string(logStr))
-}
-
-func (l *DefaultLogger) Printf(format string, args ...interface{}) {
 	content := fmt.Sprintf(format, args...)
 	logStr, _ := json.Marshal(LogData{Level: LevelInfo, Content: content})
 	fmt.Println(string(logStr))
