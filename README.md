@@ -16,14 +16,14 @@ redis_util_test.go 和redis_util_cache_test.go 包含了go test 运行demo
 ### 基础使用
 
 ```
-	redisUtil := redisutil.NewRedisUtil(redisPool)
-	cacheKey := "cclehui_test_set_get_key_211022"
+redisUtil := redisutil.NewRedisUtil(redisPool)
+cacheKey := "cclehui_test_set_get_key_211022"
 
-	_ = redisUtil.Set(ctx, cacheKey, "axxxaa", 3600) // 设置缓存
+_ = redisUtil.Set(ctx, cacheKey, "axxxaa", 3600) // 设置缓存
 
-	valueStrRes := ""
-	_, _ = redisUtil.Get(ctx, cacheKey, &valueStrRes) // 获取缓存
-	fmt.Println("获取缓存:", valueStrRes)
+valueStrRes := ""
+_, _ = redisUtil.Get(ctx, cacheKey, &valueStrRes) // 获取缓存
+fmt.Println("获取缓存:", valueStrRes)
 
 ```
 
@@ -31,37 +31,37 @@ redis_util_test.go 和redis_util_cache_test.go 包含了go test 运行demo
 redis_util_cache_test.go 中有更多的使用例子
 
 ```
-	redisUtil := NewRedisUtil(getTestPool())
-	key := "gotest:redis_wrapper:get"
+redisUtil := NewRedisUtil(getTestPool())
+key := "gotest:redis_wrapper:get"
 
-	type valueStruct struct {
-		Name string
-		Age  int
+type valueStruct struct {
+	Name string
+	Age  int
+}
+
+fallbackFunc := func() (interface{}, error) {
+	fmt.Printf( "fallback 缓存穿透 call real function\n")
+	time.Sleep(time.Second * 1)
+
+	data := &valueStruct{
+		Name: "xxxxxx",
+		Age:  18,
 	}
 
-	fallbackFunc := func() (interface{}, error) {
-		fmt.Printf( "fallback 缓存穿透 call real function\n")
-		time.Sleep(time.Second * 1)
+	return data, nil
+}
 
-		data := &valueStruct{
-			Name: "xxxxxx",
-			Age:  18,
-		}
+resultData := &valueStruct{}
 
-		return data, nil
-	}
+paramsTemp := &WrapperParams{
+	Key:           Key,
+	ExpireSeconds: 600,
+	FallbackFunc:  fallbackFunc,
+	Result:        resultData,
+}
 
-	resultData := &valueStruct{}
+paramsTemp.Result = &dataResult[j]
 
-	paramsTemp := &WrapperParams{
-		Key:           Key,
-		ExpireSeconds: 600,
-		FallbackFunc:  fallbackFunc,
-		Result:        resultData,
-	}
-
-	paramsTemp.Result = &dataResult[j]
-
-    redisUtil.CacheWrapper(ctx, paramsTemp)
+redisUtil.CacheWrapper(ctx, paramsTemp)
 ```
 
