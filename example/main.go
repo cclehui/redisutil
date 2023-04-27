@@ -9,27 +9,11 @@ import (
 )
 
 func main() {
-	server := "127.0.0.1:6379"
-	password := "123456"
 	ctx := context.Background()
 
-	redisClient := &redis.Pool{
-		Dial: func() (redis.Conn, error) {
-			c, err := redis.Dial("tcp", server)
-			if err != nil {
-				return nil, err
-			}
+	redisPool := getTestPool()
 
-			if _, err := c.Do("AUTH", password); err != nil {
-				c.Close()
-				return nil, err
-			}
-
-			return c, nil
-		},
-	}
-
-	redisUtil := redisutil.NewRedisUtil(redisClient)
+	redisUtil := redisutil.NewRedisUtil(redisPool)
 	cacheKey := "cclehui_test_set_get_key_211022"
 
 	_ = redisUtil.Set(ctx, cacheKey, "axxxaa", 3600) // 设置缓存
@@ -45,4 +29,28 @@ func main() {
 
 	value, _ = redisUtil.Decr(ctx, cacheKey)
 	fmt.Println("Decr:", value)
+
+}
+
+func getTestPool() *redis.Pool {
+	server := "127.0.0.1:6379"
+	password := ""
+
+	return &redis.Pool{
+		Dial: func() (redis.Conn, error) {
+			c, err := redis.Dial("tcp", server)
+			if err != nil {
+				return nil, err
+			}
+
+			if password != "" {
+				if _, err := c.Do("AUTH", password); err != nil {
+					c.Close()
+					return nil, err
+				}
+			}
+
+			return c, nil
+		},
+	}
 }
