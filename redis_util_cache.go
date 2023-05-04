@@ -176,7 +176,9 @@ func (ru *RedisUtil) ruWrapperMgetFallbackHandle(ctx context.Context,
 				newData, err2 = ru.ruWrapperCallAndSetCache(ctx, params, fallbackIndex)
 			}
 
-			targetResultRFValue.Set(reflect.ValueOf(newData)) // 结果
+			if err2 == nil {
+				targetResultRFValue.Set(reflect.ValueOf(newData)) // 结果
+			}
 
 			return err2
 		})
